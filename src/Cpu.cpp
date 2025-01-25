@@ -119,7 +119,7 @@ void Cpu::clock() {
 
 void Cpu::opcode0() {
     if (opcode == 0x00E0) {         // Clear screen instruction
-        for (int i = 0; i < 64*32; i++) {
+        for (int i = 0; i < SCREEN_SIZE_X*SCREEN_SIZE_Y; i++) {
             screen[i] = false;
         }
     } else if (opcode == 0x00EE) {  // Return from a subroutine (function call)
@@ -130,7 +130,7 @@ void Cpu::opcode0() {
 }
 // 1NNN: Jump to address NNN
 void Cpu::opcode1() { pc = NNN(opcode); }
-// 2NNN: Call a subroutine at address NNN (function)
+// 2NNN: Call a subroutine (function) at address NNN
 void Cpu::opcode2() {
     if (!stackPush(pc)) return;
     opcode1();
@@ -155,14 +155,14 @@ void Cpu::opcode7() { reg[X(opcode)] += NN(opcode); }
 void Cpu::opcode8() {
     switch (N(opcode)) {
         case 0x0: reg[X(opcode)]  = reg[Y(opcode)]; break;  // 8XY0: Store the value of register VY in register VX
-        case 0x1: reg[X(opcode)] |= reg[Y(opcode)]; break;  // 8XY1: Store VX binary OR'd with VY in register VX
-        case 0x2: reg[X(opcode)] &= reg[Y(opcode)]; break;  // 8XY2: Store VX binary AND'd with VY in register VX
-        case 0x3: reg[X(opcode)] ^= reg[Y(opcode)]; break;  // 8XY3: Store VX binary XOR'd with VY in register VX
+        case 0x1: reg[X(opcode)] |= reg[Y(opcode)]; break;  // 8XY1: Store VX bitwise OR'd with VY in register VX
+        case 0x2: reg[X(opcode)] &= reg[Y(opcode)]; break;  // 8XY2: Store VX bitwise AND'd with VY in register VX
+        case 0x3: reg[X(opcode)] ^= reg[Y(opcode)]; break;  // 8XY3: Store VX bitwise XOR'd with VY in register VX
         // 8XY4: Add the value of register VY to register VX, setting register VF to 1 if a carry occurs, 0 otherwise
         case 0x4: {
             uint8_t regX = reg[X(opcode)];
             uint8_t regY = reg[Y(opcode)];
-            if (regX+regY < regX || regX+regY < regY) reg[0xF] = 0x01;
+            if ((uint16_t)(regX+regY) > 0xFF) reg[0xF] = 0x01;
             else reg[0xF] = 0x00;
             reg[X(opcode)] = regX+regY;
             break;
@@ -192,7 +192,7 @@ void Cpu::opcode8() {
         }
         // 8XYE: Set the value of register VX to the value of VY shifted left by one bit, setting VF to the leftmost bit of VY
         case 0xE: // TODO Super-CHIP
-            reg[0xF] = reg[Y(opcode)] & 0x80;
+            reg[0xF] = ((reg[Y(opcode)] & 0x80) >> 7) & 0x01;
             reg[X(opcode)] = reg[Y(opcode)] << 1;
             break;
         default: break;
@@ -204,7 +204,7 @@ void Cpu::opcode9() {
 }
 void Cpu::opcodeA() { regI = NNN(opcode); }         // ANNN: Store NNN in register I
 void Cpu::opcodeB() { pc = NNN(opcode) + reg[0]; }  // BNNN: Jump to address NNN + V0
-// CXNN: Set the lower hexadecimal digit of register VX to a random value, the upper hexadecimal digit to 00
+// CXNN: Set register VX to a random value bitwise AND'd with NN
 void Cpu::opcodeC() { reg[X(opcode)] = rand() & NN(opcode); }
 // DXYN: Draw a sprite at screen position (VX, VY) using N bytes of sprite data stored at the offset in memory specified by register I,
 // setting register VF to 1 if any pixels are turned off after drawing, 0 otherwise
@@ -285,17 +285,15 @@ void Cpu::opcodeF() {
         }
         // FX55: Store the values of registers V0 to VX (inclusive) at memory addresses I, I+1, ..., I+X, then set register I to I+X+1
         case 0x55:
-            for (int i = 0; i <= (X(opcode)); i++) {
+            for (int i = 0; i <= X(opcode); i++) {
                 ram[regI+i] = reg[i];
             }
-            regI += (X(opcode))+1;
             break;
         // FX65: Set the values of registers V0 to VX (inclusive) to values at memory addresses I, I+1, ..., I+X, then set register I to I+X+1
         case 0x65:
-            for (int i = 0; i <= (X(opcode)); i++) {
+            for (int i = 0; i <= X(opcode); i++) {
                 reg[i] = ram[regI+i];
             }
-            regI += (X(opcode))+1;
             break;
         default: break;
     }
