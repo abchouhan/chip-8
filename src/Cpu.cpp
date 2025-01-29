@@ -115,6 +115,8 @@ void Cpu::clock() {
         case 0xF: opcodeF(); break;
         default: break;
     }
+    lastPressedKey = 0x10;
+    lastReleasedKey = 0x10;
 }
 
 void Cpu::opcode0() {
@@ -154,47 +156,64 @@ void Cpu::opcode7() { reg[X(opcode)] += NN(opcode); }
 // 8XYN
 void Cpu::opcode8() {
     switch (N(opcode)) {
-        case 0x0: reg[X(opcode)]  = reg[Y(opcode)]; break;  // 8XY0: Store the value of register VY in register VX
-        case 0x1: reg[X(opcode)] |= reg[Y(opcode)]; break;  // 8XY1: Store VX bitwise OR'd with VY in register VX
-        case 0x2: reg[X(opcode)] &= reg[Y(opcode)]; break;  // 8XY2: Store VX bitwise AND'd with VY in register VX
-        case 0x3: reg[X(opcode)] ^= reg[Y(opcode)]; break;  // 8XY3: Store VX bitwise XOR'd with VY in register VX
+	// 8XY0: Store the value of register VY in register VX
+        case 0x0:
+			reg[X(opcode)]  = reg[Y(opcode)];
+			reg[0xF] = 0x00; // VF register is reset on the COSMAC VIP interpreter
+			break;
+		// 8XY1: Store VX bitwise OR'd with VY in register VX
+        case 0x1:
+			reg[X(opcode)] |= reg[Y(opcode)];
+			reg[0xF] = 0x00; // VF register is reset on the COSMAC VIP interpreter
+			break;
+		// 8XY2: Store VX bitwise AND'd with VY in register VX
+        case 0x2:
+			reg[X(opcode)] &= reg[Y(opcode)];
+			reg[0xF] = 0x00; // VF register is reset on the COSMAC VIP interpreter
+			break;
+		// 8XY3: Store VX bitwise XOR'd with VY in register VX
+        case 0x3:
+			reg[X(opcode)] ^= reg[Y(opcode)];
+			reg[0xF] = 0x00; // VF register is reset on the COSMAC VIP interpreter
+			break;
         // 8XY4: Add the value of register VY to register VX, setting register VF to 1 if a carry occurs, 0 otherwise
         case 0x4: {
             uint8_t regX = reg[X(opcode)];
             uint8_t regY = reg[Y(opcode)];
-            if ((uint16_t)(regX+regY) > 0xFF) reg[0xF] = 0x01;
-            else reg[0xF] = 0x00;
             reg[X(opcode)] = regX+regY;
+            reg[0xF] = (uint16_t)(regX+regY) > 0xFF;
             break;
         }
         // 8XY5: Subtract the value of register VY from register VX, setting register VF to 0 if a borrow occurs, 1 otherwise
         case 0x5: {
             uint8_t regX = reg[X(opcode)];
             uint8_t regY = reg[Y(opcode)];
-            if (regX > regY) reg[0xF] = 0x01;
-            else reg[0xF] = 0x00;
             reg[X(opcode)] = regX-regY;
+            reg[0xF] = regX >= regY;
             break;
         }
         // 8XY6: Set the value of register VX to the value of VY shifted right by one bit, setting VF to the rightmost bit of VY
-        case 0x6: // TODO Super-CHIP
-            reg[0xF] = reg[Y(opcode)] & 0x01;
+        case 0x6: {// TODO Super-CHIP
+			bool rightmostBit = reg[Y(opcode)] & 0x01;
             reg[X(opcode)] = reg[Y(opcode)] >> 1;
+            reg[0xF] = rightmostBit;
             break;
+		}
         // 8XY7: Set the value of register VX to VY minus VX, setting register VF to 0 if a borrow occurs, 1 otherwise
         case 0x7: {
             uint8_t regX = reg[X(opcode)];
             uint8_t regY = reg[Y(opcode)];
-            if (regY > regX) reg[0xF] = 0x01;
-            else reg[0xF] = 0x00;
             reg[X(opcode)] = regY-regX;
+            reg[0xF] = regY >= regX;
             break;
         }
         // 8XYE: Set the value of register VX to the value of VY shifted left by one bit, setting VF to the leftmost bit of VY
-        case 0xE: // TODO Super-CHIP
-            reg[0xF] = ((reg[Y(opcode)] & 0x80) >> 7) & 0x01;
+        case 0xE: {// TODO Super-CHIP
+			bool leftmostBit = ((reg[Y(opcode)] & 0x80) >> 7) & 0x01;
             reg[X(opcode)] = reg[Y(opcode)] << 1;
+            reg[0xF] = leftmostBit;
             break;
+		}
         default: break;
     }
 }
@@ -283,17 +302,19 @@ void Cpu::opcodeF() {
             ram[regI+2] = value%100%10;
             break;
         }
-        // FX55: Store the values of registers V0 to VX (inclusive) at memory addresses I, I+1, ..., I+X, then set register I to I+X+1
+        // FX55: Store the values of registers V0 to VX (inclusive) at memory addresses I, I+1, ..., I+X
         case 0x55:
             for (int i = 0; i <= X(opcode); i++) {
                 ram[regI+i] = reg[i];
             }
+            regI += X(opcode)+1; // Increment register I by X+1
             break;
-        // FX65: Set the values of registers V0 to VX (inclusive) to values at memory addresses I, I+1, ..., I+X, then set register I to I+X+1
+        // FX65: Set the values of registers V0 to VX (inclusive) to values at memory addresses I, I+1, ..., I+X
         case 0x65:
             for (int i = 0; i <= X(opcode); i++) {
                 reg[i] = ram[regI+i];
             }
+            regI += X(opcode)+1; // Increment register I by X+1
             break;
         default: break;
     }

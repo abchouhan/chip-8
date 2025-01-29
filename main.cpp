@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
 	char *fontPath;
 	char *romPath;
 
-	for (int i = 1; i < argc; ++i) {
+	for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0 || strcmp(argv[i], "--help") == 0) {
             std::cout << "Usage: chip-8 [OPTIONS] [INPUT FILE]\n\nwith options:\n"
 			"-t, --terminal-mode\nUse this option if the emulated display is to be output in the terminal.\n"
@@ -38,6 +38,7 @@ int main(int argc, char *argv[]) {
 				try {
 					int c = std::stoi(argv[++i]);
 					if (c < 0) throw 1;
+					clockSpeed = c;
 				} catch (...) {
 					std::cerr << "--clock-speed option must be a positive number." << std::endl;
 					return EXIT_FAILURE;
@@ -51,6 +52,7 @@ int main(int argc, char *argv[]) {
 				try {
 					int r = std::stoi(argv[++i]);
 					if (r < 0) throw 1;
+					refreshRate = r;
 				} catch (...) {
 					std::cerr << "--refresh-rate option must be a positive number." << std::endl;
 					return EXIT_FAILURE;
